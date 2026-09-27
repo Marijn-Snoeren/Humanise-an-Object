@@ -18,28 +18,37 @@ export default function PneumaticPressExperiment({
   const isMouseDown = useRef(false);
 
   useEffect(() => {
-    const handlePointerMove = (e: PointerEvent) => {
+    const handleMove = (e: PointerEvent) => {
       posRef.current = { x: e.clientX, y: e.clientY };
+      setPos({ x: e.clientX, y: e.clientY });
+
       if (!telemetry.isCompleted) {
         recordMovement(e.clientX, e.clientY);
       }
-      setPos({ x: e.clientX, y: e.clientY });
     };
 
-    const handleDown = () => {
+    const handleDown = (e: MouseEvent | PointerEvent) => {
       isMouseDown.current = true;
+      if (!posRef.current) {
+        posRef.current = { x: e.clientX, y: e.clientY };
+        setPos({ x: e.clientX, y: e.clientY });
+      }
     };
 
     const handleUp = () => {
       isMouseDown.current = false;
     };
 
-    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerdown', handleDown);
+    window.addEventListener('pointerup', handleUp);
     window.addEventListener('mousedown', handleDown);
     window.addEventListener('mouseup', handleUp);
 
     return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerdown', handleDown);
+      window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('mousedown', handleDown);
       window.removeEventListener('mouseup', handleUp);
     };
@@ -47,29 +56,34 @@ export default function PneumaticPressExperiment({
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (telemetry.isCompleted || !buttonRef.current || !posRef.current) return;
+      if (telemetry.isCompleted) return;
 
-      const b = buttonRef.current.getBoundingClientRect();
-      const curX = posRef.current.x;
-      const curY = posRef.current.y;
+      const curPos = posRef.current;
+      const btn = buttonRef.current;
 
-      const isOverButton =
-        curX >= b.left && curX <= b.right && curY >= b.top && curY <= b.bottom;
+      let isOver = false;
+      if (btn && curPos) {
+        const b = btn.getBoundingClientRect();
+        // Ruime hitbox rond de knop
+        isOver =
+          curPos.x >= b.left - 10 &&
+          curPos.x <= b.right + 10 &&
+          curPos.y >= b.top - 10 &&
+          curPos.y <= b.bottom + 10;
+      }
 
-      if (isMouseDown.current && isOverButton) {
-        const next = pressureRef.current + 2.5;
-        if (next >= 100) {
-          pressureRef.current = 100;
-          setPressure(100);
-          onSuccess();
-          return;
-        }
+      if (isMouseDown.current && isOver) {
+        const next = Math.min(100, pressureRef.current + 2.2);
         pressureRef.current = next;
         setPressure(next);
+
+        if (next >= 100) {
+          onSuccess();
+        }
       } else {
         if (pressureRef.current > 0) {
           registerFrictionEvent();
-          const decayed = Math.max(0, pressureRef.current - 6);
+          const decayed = Math.max(0, pressureRef.current - 4.5);
           pressureRef.current = decayed;
           setPressure(decayed);
         }
@@ -80,24 +94,43 @@ export default function PneumaticPressExperiment({
   }, [telemetry.isCompleted, onSuccess, registerFrictionEvent]);
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center bg-[#e8ebe6]">
+    <div
+      onPointerDown={() => {
+        isMouseDown.current = true;
+      }}
+      onPointerUp={() => {
+        isMouseDown.current = false;
+      }}
+      className="relative flex h-full w-full items-center justify-center bg-[#e8ebe6]"
+    >
       <div className="flex flex-col items-center gap-4">
         <StandardButton
           ref={buttonRef}
           isSuccess={telemetry.isCompleted}
-          label={`HOLD PRESSURE (${Math.round(pressure)}%)`}
+          label={
+            isMouseDown.current && pressure > 0
+              ? `COMPRESSING (${Math.round(pressure)}%)`
+              : 'HOLD DOWN TO COMPRESS'
+          }
         />
-        <div className="h-2.5 w-64 rounded-full bg-white p-0.5 shadow-sm border border-[#c5edab]">
+        <div className="h-3 w-72 rounded-full bg-white p-0.5 shadow-sm border border-[#c5edab] overflow-hidden">
           <div
             style={{ width: `${pressure}%` }}
             className="h-full rounded-full bg-[#0e0f0c] transition-all duration-75"
           />
         </div>
+        <p className="text-[11px] font-semibold tracking-wider text-[#868685] uppercase">
+          {telemetry.isCompleted
+            ? 'HYDRAULIC PRESSURE DISCHARGED'
+            : 'Click and hold down the button until charge reaches 100%'}
+        </p>
       </div>
 
       <div
         style={{
-          transform: pos ? `translate(${pos.x - 9}px, ${pos.y - 9}px)` : 'translate(-100px, -100px)',
+          transform: pos
+            ? `translate(${pos.x - 9}px, ${pos.y - 9}px)`
+            : 'translate(-100px, -100px)',
           opacity: pos ? 1 : 0,
         }}
         className="pointer-events-none fixed left-0 top-0 h-4 w-4 rounded-full bg-[#0e0f0c] ring-4 ring-[#9fe870] shadow-md z-[9999] transition-opacity duration-75"
