@@ -14,8 +14,10 @@ export default function PneumaticPressExperiment({
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const posRef = useRef<{ x: number; y: number } | null>(null);
   const [pressure, setPressure] = useState(0);
+  
   const pressureRef = useRef(0);
-  const isMouseDown = useRef(false);
+  const isHoldingRef = useRef(false);
+  const successCalledRef = useRef(false);
 
   useEffect(() => {
     const handleMove = (e: PointerEvent) => {
@@ -27,16 +29,12 @@ export default function PneumaticPressExperiment({
       }
     };
 
-    const handleDown = (e: MouseEvent | PointerEvent) => {
-      isMouseDown.current = true;
-      if (!posRef.current) {
-        posRef.current = { x: e.clientX, y: e.clientY };
-        setPos({ x: e.clientX, y: e.clientY });
-      }
+    const handleDown = () => {
+      isHoldingRef.current = true;
     };
 
     const handleUp = () => {
-      isMouseDown.current = false;
+      isHoldingRef.current = false;
     };
 
     window.addEventListener('pointermove', handleMove);
@@ -45,18 +43,9 @@ export default function PneumaticPressExperiment({
     window.addEventListener('mousedown', handleDown);
     window.addEventListener('mouseup', handleUp);
 
-    return () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerdown', handleDown);
-      window.removeEventListener('pointerup', handleUp);
-      window.removeEventListener('mousedown', handleDown);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, [telemetry.isCompleted, recordMovement]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (telemetry.isCompleted) return;
+    // Hoofd game-loop op vaste interval
+    const interval = setInterval(() => {
+      if (telemetry.isCompleted || successCalledRef.current) return;
 
       const curPos = posRef.current;
       const btn = buttonRef.current;
@@ -64,43 +53,44 @@ export default function PneumaticPressExperiment({
       let isOver = false;
       if (btn && curPos) {
         const b = btn.getBoundingClientRect();
-        // Ruime hitbox rond de knop
         isOver =
-          curPos.x >= b.left - 10 &&
-          curPos.x <= b.right + 10 &&
-          curPos.y >= b.top - 10 &&
-          curPos.y <= b.bottom + 10;
+          curPos.x >= b.left - 15 &&
+          curPos.x <= b.right + 15 &&
+          curPos.y >= b.top - 15 &&
+          curPos.y <= b.bottom + 15;
       }
 
-      if (isMouseDown.current && isOver) {
-        const next = Math.min(100, pressureRef.current + 2.2);
-        pressureRef.current = next;
-        setPressure(next);
+      if (isHoldingRef.current && isOver) {
+        pressureRef.current = Math.min(100, pressureRef.current + 2.5);
+        setPressure(pressureRef.current);
 
-        if (next >= 100) {
+        if (pressureRef.current >= 100 && !successCalledRef.current) {
+          successCalledRef.current = true;
           onSuccess();
         }
       } else {
         if (pressureRef.current > 0) {
           registerFrictionEvent();
-          const decayed = Math.max(0, pressureRef.current - 4.5);
-          pressureRef.current = decayed;
-          setPressure(decayed);
+          pressureRef.current = Math.max(0, pressureRef.current - 4);
+          setPressure(pressureRef.current);
         }
       }
-    }, 20);
+    }, 25);
 
-    return () => clearInterval(timer);
-  }, [telemetry.isCompleted, onSuccess, registerFrictionEvent]);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerdown', handleDown);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('mousedown', handleDown);
+      window.removeEventListener('mouseup', handleUp);
+      clearInterval(interval);
+    };
+  }, [telemetry.isCompleted, onSuccess, registerFrictionEvent, recordMovement]);
 
   return (
     <div
-      onPointerDown={() => {
-        isMouseDown.current = true;
-      }}
-      onPointerUp={() => {
-        isMouseDown.current = false;
-      }}
+      onPointerDown={() => { isHoldingRef.current = true; }}
+      onPointerUp={() => { isHoldingRef.current = false; }}
       className="relative flex h-full w-full items-center justify-center bg-[#e8ebe6]"
     >
       <div className="flex flex-col items-center gap-4">
@@ -108,7 +98,7 @@ export default function PneumaticPressExperiment({
           ref={buttonRef}
           isSuccess={telemetry.isCompleted}
           label={
-            isMouseDown.current && pressure > 0
+            pressure > 0
               ? `COMPRESSING (${Math.round(pressure)}%)`
               : 'HOLD DOWN TO COMPRESS'
           }
@@ -122,7 +112,7 @@ export default function PneumaticPressExperiment({
         <p className="text-[11px] font-semibold tracking-wider text-[#868685] uppercase">
           {telemetry.isCompleted
             ? 'HYDRAULIC PRESSURE DISCHARGED'
-            : 'Click and hold down the button until charge reaches 100%'}
+            : 'Click and hold down on the button to build pressure to 100%'}
         </p>
       </div>
 
