@@ -133,14 +133,11 @@ export default function LabExperimentPage() {
       {!isCalibrated ? (
         <div className="relative flex h-full w-full flex-col items-center justify-end pb-20">
           <div className="flex flex-col items-center gap-4 text-center">
-            <p className="text-xs font-semibold text-[#868685] uppercase tracking-wider">
-              Move your cursor below to begin the trial from the calibrated baseline
-            </p>
             <button
               onClick={handleStartCalibration}
               className="rounded-[24px] bg-[#0e0f0c] text-[#9fe870] px-10 py-5 font-bold text-sm tracking-tight shadow-md hover:bg-[#163300] active:scale-95 transition pointer-events-auto"
             >
-              [ CLICK TO START EXPERIMENT ]
+              CLICK TO START
             </button>
           </div>
 
