@@ -18,8 +18,9 @@ import InertiaMass from '@/experiments/07-inertia-mass';
 import ElasticTether from '@/experiments/08-elastic-tether';
 import EvasiveTarget from '@/experiments/09-evasive-target';
 import MechanicalGate from '@/experiments/10-mechanical-gate';
+import { ExperimentProps } from '@/experiments/types';
 
-const COMPONENTS_MAP: Record<string, React.ComponentType<any>> = {
+const COMPONENTS_MAP: Record<string, React.ComponentType<ExperimentProps>> = {
   '01-viscous-drag': ViscousDrag,
   '02-magnetic-repulsion': MagneticRepulsion,
   '03-ice-break-speed-limit': FragileIce,
@@ -35,7 +36,7 @@ const COMPONENTS_MAP: Record<string, React.ComponentType<any>> = {
 export default function LabExperimentPage() {
   const params = useParams();
   const rawSlug = params?.slug;
-  const slug = Array.isArray(rawSlug) ? rawSlug[0] : (rawSlug || '');
+  const slug = typeof rawSlug === 'string' ? rawSlug : Array.isArray(rawSlug) ? rawSlug[0] : '';
 
   const metadata = EXPERIMENTS_REGISTRY.find((e) => e.slug === slug);
   const ExperimentComponent = COMPONENTS_MAP[slug];
@@ -132,11 +133,14 @@ export default function LabExperimentPage() {
       {!isCalibrated ? (
         <div className="relative flex h-full w-full flex-col items-center justify-end pb-20">
           <div className="flex flex-col items-center gap-4 text-center">
+            <p className="text-xs font-semibold text-[#868685] uppercase tracking-wider">
+              Move your cursor below to begin the trial from the calibrated baseline
+            </p>
             <button
               onClick={handleStartCalibration}
               className="rounded-[24px] bg-[#0e0f0c] text-[#9fe870] px-10 py-5 font-bold text-sm tracking-tight shadow-md hover:bg-[#163300] active:scale-95 transition pointer-events-auto"
             >
-              START EXPERIMENT
+              [ CLICK TO START EXPERIMENT ]
             </button>
           </div>
 

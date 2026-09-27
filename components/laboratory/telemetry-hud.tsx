@@ -9,7 +9,7 @@ interface TelemetryHudProps {
   metadataFormula?: string;
 }
 
-export function TelemetryHud({ telemetry, onReset }: TelemetryHudProps) {
+export function TelemetryHud({ telemetry, onReset, metadataFormula }: TelemetryHudProps) {
   return (
     <aside className="w-64 rounded-[24px] bg-white p-6 text-xs text-[#0e0f0c] shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-[#e8ebe6]">
       <div className="flex items-center justify-between border-b border-[#e8ebe6] pb-3">
@@ -52,6 +52,12 @@ export function TelemetryHud({ telemetry, onReset }: TelemetryHudProps) {
           <span className="text-[#868685]">Friction</span>
           <span className="font-bold font-mono text-[#0e0f0c]">{telemetry.frictionEvents}</span>
         </div>
+
+        {metadataFormula && (
+          <div className="pt-2 border-t border-[#e8ebe6] text-[10px] text-[#868685] font-mono break-all">
+            {metadataFormula}
+          </div>
+        )}
       </div>
 
       <div className="mt-5 pt-2">
