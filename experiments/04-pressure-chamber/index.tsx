@@ -14,18 +14,33 @@ export default function PneumaticPressExperiment({
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const posRef = useRef<{ x: number; y: number } | null>(null);
   const [pressure, setPressure] = useState(0);
-  
+
   const pressureRef = useRef(0);
   const isHoldingRef = useRef(false);
   const successCalledRef = useRef(false);
+
+  // Keep latest callbacks/flags in refs so the game loop effect can mount once.
+  // Parent re-renders every animation frame (telemetry HUD), which would otherwise
+  // recreate `onSuccess` and tear down the interval before pressure can build.
+  const onSuccessRef = useRef(onSuccess);
+  const registerFrictionEventRef = useRef(registerFrictionEvent);
+  const recordMovementRef = useRef(recordMovement);
+  const isCompletedRef = useRef(telemetry.isCompleted);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    registerFrictionEventRef.current = registerFrictionEvent;
+    recordMovementRef.current = recordMovement;
+    isCompletedRef.current = telemetry.isCompleted;
+  });
 
   useEffect(() => {
     const handleMove = (e: PointerEvent) => {
       posRef.current = { x: e.clientX, y: e.clientY };
       setPos({ x: e.clientX, y: e.clientY });
 
-      if (!telemetry.isCompleted) {
-        recordMovement(e.clientX, e.clientY);
+      if (!isCompletedRef.current) {
+        recordMovementRef.current(e.clientX, e.clientY);
       }
     };
 
@@ -40,12 +55,10 @@ export default function PneumaticPressExperiment({
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerdown', handleDown);
     window.addEventListener('pointerup', handleUp);
-    window.addEventListener('mousedown', handleDown);
-    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
 
-    // Hoofd game-loop op vaste interval
     const interval = setInterval(() => {
-      if (telemetry.isCompleted || successCalledRef.current) return;
+      if (isCompletedRef.current || successCalledRef.current) return;
 
       const curPos = posRef.current;
       const btn = buttonRef.current;
@@ -66,14 +79,12 @@ export default function PneumaticPressExperiment({
 
         if (pressureRef.current >= 100 && !successCalledRef.current) {
           successCalledRef.current = true;
-          onSuccess();
+          onSuccessRef.current();
         }
-      } else {
-        if (pressureRef.current > 0) {
-          registerFrictionEvent();
-          pressureRef.current = Math.max(0, pressureRef.current - 4);
-          setPressure(pressureRef.current);
-        }
+      } else if (pressureRef.current > 0) {
+        registerFrictionEventRef.current();
+        pressureRef.current = Math.max(0, pressureRef.current - 4);
+        setPressure(pressureRef.current);
       }
     }, 25);
 
@@ -81,16 +92,19 @@ export default function PneumaticPressExperiment({
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerdown', handleDown);
       window.removeEventListener('pointerup', handleUp);
-      window.removeEventListener('mousedown', handleDown);
-      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
       clearInterval(interval);
     };
-  }, [telemetry.isCompleted, onSuccess, registerFrictionEvent, recordMovement]);
+  }, []);
 
   return (
     <div
-      onPointerDown={() => { isHoldingRef.current = true; }}
-      onPointerUp={() => { isHoldingRef.current = false; }}
+      onPointerDown={() => {
+        isHoldingRef.current = true;
+      }}
+      onPointerUp={() => {
+        isHoldingRef.current = false;
+      }}
       className="relative flex h-full w-full items-center justify-center bg-[#e8ebe6]"
     >
       <div className="flex flex-col items-center gap-4">
@@ -100,7 +114,7 @@ export default function PneumaticPressExperiment({
           label={
             pressure > 0
               ? `COMPRESSING (${Math.round(pressure)}%)`
-              : 'HOLD DOWN TO COMPRESS'
+              : 'HOLD DOWN'
           }
         />
         <div className="h-3 w-72 rounded-full bg-white p-0.5 shadow-sm border border-[#c5edab] overflow-hidden">
@@ -109,11 +123,6 @@ export default function PneumaticPressExperiment({
             className="h-full rounded-full bg-[#0e0f0c] transition-all duration-75"
           />
         </div>
-        <p className="text-[11px] font-semibold tracking-wider text-[#868685] uppercase">
-          {telemetry.isCompleted
-            ? 'HYDRAULIC PRESSURE DISCHARGED'
-            : 'Click and hold down on the button to build pressure to 100%'}
-        </p>
       </div>
 
       <div
