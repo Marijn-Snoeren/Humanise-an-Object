@@ -11,7 +11,7 @@ export interface TelemetryData {
 export interface ExperimentMetadata {
   slug: string;
   id: string;
-  titlestring;
+  title: string;
   subtitle: string;
   theoryCategory: 'Motoric' | 'Intentional' | 'Affective' | 'Deliberative';
   formula: string;
